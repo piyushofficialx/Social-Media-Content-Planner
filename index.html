@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accurex Social Planner</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#f5f3ff', 100: '#ede9fe', 500: '#6366f1', 600: '#4f46e5', 900: '#1e1b4b' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        
+        /* Smooth Fade In */
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Loader */
+        .loader { border-top-color: #4f46e5; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 font-sans overflow-hidden">
+
+    <div id="app" class="h-screen w-full relative flex">
+
+        <div id="auth-view" class="absolute inset-0 z-50 bg-white dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
+            <div class="w-full max-w-md space-y-8 fade-in">
+                <div class="text-center">
+                    <h1 class="text-4xl font-bold tracking-tight text-brand-600">Accurex Planner</h1>
+                    <p class="mt-2 text-gray-500 dark:text-gray-400">Manage your content with precision.</p>
+                </div>
+                <div class="bg-white dark:bg-zinc-900 shadow-xl rounded-2xl p-8 border border-gray-100 dark:border-zinc-800">
+                    <form id="login-form" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium">Email address</label>
+                            <input id="email" type="email" required class="mt-1 block w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium">Password</label>
+                            <input id="password" type="password" required class="mt-1 block w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-brand-500 transition">
+                        </div>
+                        <button type="submit" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-brand-600 hover:bg-brand-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-all">
+                            Sign in
+                        </button>
+                    </form>
+                    <div class="mt-6 text-center">
+                        <button onclick="authAction('google')" class="text-sm font-medium text-brand-600 hover:text-brand-500">Sign in with Google</button>
+                        <span class="mx-2 text-gray-300">|</span>
+                        <button onclick="toggleAuthMode()" id="auth-switch-text" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Create an account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <aside id="sidebar" class="hidden md:flex w-64 flex-col bg-white dark:bg-zinc-900 border-r border-gray-200 dark:border-zinc-800 transition-transform duration-300">
+            <div class="h-16 flex items-center px-6 border-b border-gray-100 dark:border-zinc-800">
+                <i data-lucide="layers" class="h-6 w-6 text-brand-600 mr-2"></i>
+                <span class="text-lg font-bold tracking-tight">Planner</span>
+            </div>
+            
+            <nav class="flex-1 px-4 py-6 space-y-1">
+                <button onclick="navigate('dashboard')" class="nav-item w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-brand-600 transition-colors">
+                    <i data-lucide="layout-dashboard" class="mr-3 h-5 w-5"></i> Dashboard
+                </button>
+                <button onclick="navigate('planner')" class="nav-item w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-brand-600 transition-colors">
+                    <i data-lucide="pen-tool" class="mr-3 h-5 w-5"></i> Content Planner
+                </button>
+                <button onclick="navigate('calendar')" class="nav-item w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-brand-600 transition-colors">
+                    <i data-lucide="calendar" class="mr-3 h-5 w-5"></i> Calendar
+                </button>
+                <button onclick="navigate('library')" class="nav-item w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-brand-600 transition-colors">
+                    <i data-lucide="bookmark" class="mr-3 h-5 w-5"></i> Saved & AI
+                </button>
+                <button onclick="navigate('analytics')" class="nav-item w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-brand-600 transition-colors">
+                    <i data-lucide="bar-chart-2" class="mr-3 h-5 w-5"></i> Analytics
+                </button>
+                <button onclick="navigate('settings')" class="nav-item w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-brand-600 transition-colors">
+                    <i data-lucide="settings" class="mr-3 h-5 w-5"></i> Settings
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-200 dark:border-zinc-800">
+                <div class="flex items-center space-x-3">
+                    <img id="user-avatar" src="" class="h-8 w-8 rounded-full bg-gray-300" alt="Profile">
+                    <div class="flex-1 min-w-0">
+                        <p id="user-name" class="text-sm font-medium text-gray-900 dark:text-white truncate">User</p>
+                    </div>
+                    <button onclick="logout()" class="text-gray-400 hover:text-red-500 transition"><i data-lucide="log-out" class="h-5 w-5"></i></button>
+                </div>
+            </div>
+        </aside>
+
+        <main id="main-content" class="flex-1 flex flex-col h-full overflow-hidden hidden relative">
+            <header class="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-gray-200 dark:border-zinc-800 h-16 flex items-center justify-between px-6 z-10">
+                <div class="md:hidden">
+                    <button onclick="document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('absolute'); document.getElementById('sidebar').classList.toggle('z-50'); document.getElementById('sidebar').classList.toggle('h-full');" class="text-gray-500"><i data-lucide="menu"></i></button>
+                </div>
+                <h2 id="page-title" class="text-xl font-semibold text-gray-800 dark:text-white">Dashboard</h2>
+                <div class="flex items-center space-x-4">
+                    <button onclick="navigate('planner')" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-all flex items-center">
+                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i> Create
+                    </button>
+                    <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-500 transition">
+                        <i data-lucide="moon" class="h-5 w-5 dark:hidden"></i>
+                        <i data-lucide="sun" class="h-5 w-5 hidden dark:block"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div id="content-area" class="flex-1 overflow-y-auto p-6 scroll-smooth pb-20">
+                
+                <section id="view-dashboard" class="fade-in space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-gray-100 dark:border-zinc-800 shadow-sm">
+                            <div class="text-gray-500 text-sm font-medium">Total Posts</div>
+                            <div class="text-3xl font-bold mt-2" id="dash-total">0</div>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-gray-100 dark:border-zinc-800 shadow-sm">
+                            <div class="text-brand-600 text-sm font-medium">Scheduled</div>
+                            <div class="text-3xl font-bold mt-2" id="dash-scheduled">0</div>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-gray-100 dark:border-zinc-800 shadow-sm">
+                            <div class="text-green-500 text-sm font-medium">Completed</div>
+                            <div class="text-3xl font-bold mt-2" id="dash-completed">0</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-brand-600 to-indigo-700 p-6 rounded-xl shadow-lg text-white">
+                            <div class="text-indigo-100 text-sm font-medium">Quick Action</div>
+                            <button onclick="navigate('library')" class="mt-4 bg-white/20 backdrop-blur hover:bg-white/30 w-full py-2 rounded-lg text-sm font-medium transition">Open AI Tools</button>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold mt-8">Recent Activity</h3>
+                    <div id="dashboard-recent-list" class="space-y-3 mt-4">
+                        </div>
+                </section>
+
+                <section id="view-planner" class="hidden fade-in grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 bg-white dark:bg-zinc-900 p-6 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm h-fit sticky top-0">
+                        <h3 class="text-lg font-semibold mb-4">Create New Post</h3>
+                        <form id="post-form" class="space-y-4">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Platform</label>
+                                <select id="post-platform" class="mt-1 w-full bg-gray-50 dark:bg-zinc-800 border-none rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 text-sm">
+                                    <option value="Instagram">Instagram</option>
+                                    <option value="LinkedIn">LinkedIn</option>
+                                    <option value="Twitter">Twitter / X</option>
+                                    <option value="YouTube">YouTube</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Title / Topic</label>
+                                <input id="post-title" type="text" class="mt-1 w-full bg-gray-50 dark:bg-zinc-800 border-none rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 text-sm" placeholder="e.g. 5 Tips for UI Design">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Caption</label>
+                                <textarea id="post-caption" rows="4" class="mt-1 w-full bg-gray-50 dark:bg-zinc-800 border-none rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 text-sm" placeholder="Write your hook and content..."></textarea>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</label>
+                                    <input id="post-date" type="datetime-local" class="mt-1 w-full bg-gray-50 dark:bg-zinc-800 border-none rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</label>
+                                    <select id="post-status" class="mt-1 w-full bg-gray-50 dark:bg-zinc-800 border-none rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 text-sm">
+                                        <option value="idea">Idea</option>
+                                        <option value="scheduled">Scheduled</option>
+                                        <option value="published">Published</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Image</label>
+                                <input id="post-image" type="file" accept="image/*" class="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+                            </div>
+                            <div class="pt-2 flex gap-2">
+                                <button type="submit" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2.5 rounded-lg text-sm font-medium transition shadow-md">Save Post</button>
+                                <button type="button" onclick="document.getElementById('post-form').reset()" class="px-4 py-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-zinc-800">Clear</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="lg:col-span-2 space-y-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-semibold">Scheduled Posts</h3>
+                            <span class="text-xs text-gray-500 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded">Drag to reorder</span>
+                        </div>
+                        <div id="posts-container" class="space-y-3 min-h-[200px]">
+                            <div class="text-center text-gray-400 py-10">Loading posts...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-calendar" class="hidden fade-in">
+                    <div class="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 overflow-hidden">
+                        <div class="p-4 bg-gray-50 dark:bg-zinc-950/50 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center">
+                            <h3 class="font-bold text-lg" id="cal-month-name">Current Month</h3>
+                            <div class="flex space-x-2">
+                                <button onclick="changeMonth(-1)" class="p-1 hover:bg-gray-200 rounded"><i data-lucide="chevron-left"></i></button>
+                                <button onclick="changeMonth(1)" class="p-1 hover:bg-gray-200 rounded"><i data-lucide="chevron-right"></i></button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-px bg-gray-200 dark:bg-zinc-800" id="calendar-grid">
+                            </div>
+                    </div>
+                </section>
+
+                <section id="view-library" class="hidden fade-in space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-zinc-900 text-white p-6 rounded-xl shadow-lg relative overflow-hidden">
+                            <div class="absolute -top-10 -right-10 w-32 h-32 bg-brand-500 blur-3xl opacity-30 rounded-full"></div>
+                            <h3 class="text-lg font-bold flex items-center mb-4"><i data-lucide="sparkles" class="mr-2 text-yellow-400"></i> AI Assistant</h3>
+                            <div class="space-y-3">
+                                <button onclick="runAI('caption')" class="w-full text-left bg-white/10 hover:bg-white/20 p-3 rounded-lg text-sm transition flex justify-between">
+                                    <span>Generate Captions</span> <i data-lucide="message-square" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="runAI('hashtags')" class="w-full text-left bg-white/10 hover:bg-white/20 p-3 rounded-lg text-sm transition flex justify-between">
+                                    <span>Find Hashtags</span> <i data-lucide="hash" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="runAI('hook')" class="w-full text-left bg-white/10 hover:bg-white/20 p-3 rounded-lg text-sm transition flex justify-between">
+                                    <span>Viral Hooks</span> <i data-lucide="anchor" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2 space-y-4">
+                            <h3 class="text-lg font-semibold">Generated Content</h3>
+                            <div id="ai-output" class="grid grid-cols-1 gap-4">
+                                <div class="bg-white dark:bg-zinc-900 p-8 rounded-xl border border-dashed border-gray-300 dark:border-zinc-700 text-center text-gray-400">
+                                    Select a tool to generate content
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-analytics" class="hidden fade-in">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm">
+                            <h4 class="font-semibold mb-4">Posts per Platform</h4>
+                            <canvas id="chart-platforms"></canvas>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm">
+                            <h4 class="font-semibold mb-4">Completion Status</h4>
+                            <canvas id="chart-status"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-settings" class="hidden fade-in max-w-2xl">
+                    <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-6">
+                        <h3 class="text-xl font-bold">Account Settings</h3>
+                        <div class="flex items-center space-x-4">
+                            <div class="bg-brand-100 text-brand-600 w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold">
+                                <i data-lucide="user"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium">Profile Photo</p>
+                                <button class="text-sm text-brand-600 hover:underline">Change</button>
+                            </div>
+                        </div>
+                        <hr class="dark:border-zinc-800">
+                        <div>
+                            <h4 class="font-medium mb-2">Data Management</h4>
+                            <div class="flex gap-3">
+                                <button onclick="exportData()" class="flex items-center px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 text-sm">
+                                    <i data-lucide="download" class="w-4 h-4 mr-2"></i> Backup Data (JSON)
+                                </button>
+                                <button onclick="document.getElementById('import-file').click()" class="flex items-center px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 text-sm">
+                                    <i data-lucide="upload" class="w-4 h-4 mr-2"></i> Restore Backup
+                                </button>
+                                <input type="file" id="import-file" class="hidden" onchange="importData(this)">
+                            </div>
+                        </div>
+                        <hr class="dark:border-zinc-800">
+                        <button onclick="logout()" class="text-red-500 text-sm font-medium hover:text-red-600">Log out of all devices</button>
+                    </div>
+                </section>
+
+                <footer class="mt-12 py-6 text-center text-xs text-gray-400 border-t border-gray-200 dark:border-zinc-800">
+                    <p>© 2025. A project by Piyush · Accurex Studio — designed with precision, delivered with purpose.</p>
+                </footer>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION ---
+        // TODO: REPLACE WITH YOUR FIREBASE CONFIG KEYS
+        const firebaseConfig = {
+            apiKey: "AIzaSyDRjMyvnDd22HNvesenX6EuSVvuZsm9UU8", authDomain: "social-media-content-pla-7081d.firebaseapp.com",
+            authDomain: "social-media-content-pla-7081d.firebaseapp.com",
+            projectId: "social-media-content-pla-7081d",
+            storageBucket: "social-media-content-pla-7081d.firebasestorage.app",
+            messagingSenderId: "1063121156302",
+            appId: "1:1063121156302:web:256304067f653529dd789f",
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // State Management
+        let currentUser = null;
+        let postsCache = [];
+        let currentView = 'dashboard';
+        let currentMonth = new Date();
+
+        // --- 2. AUTHENTICATION ---
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('auth-view').classList.add('hidden');
+                document.getElementById('sidebar').classList.remove('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+                
+                document.getElementById('user-name').textContent = user.displayName || user.email;
+                document.getElementById('user-avatar').src = user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`;
+                
+                fetchPosts();
+                navigate('dashboard');
+            } else {
+                currentUser = null;
+                document.getElementById('auth-view').classList.remove('hidden');
+                document.getElementById('sidebar').classList.add('hidden');
+                document.getElementById('main-content').classList.add('hidden');
+            }
+        });
+
+        const loginForm = document.getElementById('login-form');
+        let isLoginMode = true;
+
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            const btn = document.querySelector('#login-form button[type="submit"]');
+            const switchText = document.getElementById('auth-switch-text');
+            if (isLoginMode) {
+                btn.textContent = 'Sign in';
+                switchText.textContent = 'Create an account';
+            } else {
+                btn.textContent = 'Sign up';
+                switchText.textContent = 'Already have an account? Sign in';
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                if (isLoginMode) {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } else {
+                    await auth.createUserWithEmailAndPassword(email, password);
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        function authAction(provider) {
+            if (provider === 'google') {
+                const p = new firebase.auth.GoogleAuthProvider();
+                auth.signInWithPopup(p).catch(e => alert(e.message));
+            }
+        }
+
+        function logout() {
+            auth.signOut();
+        }
+
+        // --- 3. NAVIGATION & UI ---
+        function navigate(viewId) {
+            currentView = viewId;
+            // Hide all views
+            ['dashboard', 'planner', 'calendar', 'library', 'analytics', 'settings'].forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+            });
+            // Show selected
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            
+            // Update Title
+            const titles = { dashboard: 'Dashboard', planner: 'Content Planner', calendar: 'Calendar', library: 'AI & Library', analytics: 'Analytics', settings: 'Settings' };
+            document.getElementById('page-title').textContent = titles[viewId];
+            
+            // Re-initialize specific views
+            if (viewId === 'calendar') renderCalendar();
+            if (viewId === 'analytics') renderAnalytics();
+            
+            lucide.createIcons();
+        }
+
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        // --- 4. FIRESTORE & LOGIC ---
+        
+        // Fetch Posts
+        function fetchPosts() {
+            db.collection('users').doc(currentUser.uid).collection('posts')
+                .orderBy('date', 'asc')
+                .onSnapshot(snapshot => {
+                    postsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderPostsList();
+                    updateDashboardStats();
+                });
+        }
+
+        // Create Post
+        const postForm = document.getElementById('post-form');
+        postForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.textContent;
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
+
+            const title = document.getElementById('post-title').value;
+            const platform = document.getElementById('post-platform').value;
+            const caption = document.getElementById('post-caption').value;
+            const date = document.getElementById('post-date').value;
+            const status = document.getElementById('post-status').value;
+            const fileInput = document.getElementById('post-image');
+            
+            let imageUrl = '';
+
+            try {
+                // Upload Image (If exists)
+                if (fileInput.files[0]) {
+                    const file = fileInput.files[0];
+                    const storageRef = storage.ref(`users/${currentUser.uid}/${Date.now()}_${file.name}`);
+                    await storageRef.put(file);
+                    imageUrl = await storageRef.getDownloadURL();
+                }
+
+                await db.collection('users').doc(currentUser.uid).collection('posts').add({
+                    title, platform, caption, date, status, imageUrl,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                postForm.reset();
+                alert('Post saved successfully!');
+            } catch (error) {
+                console.error(error);
+                alert('Error saving post: ' + error.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        // Render Posts List (Drag & Drop)
+        function renderPostsList() {
+            const container = document.getElementById('posts-container');
+            container.innerHTML = '';
+
+            postsCache.forEach(post => {
+                const dateObj = new Date(post.date);
+                const platformColors = {
+                    'Instagram': 'text-pink-600 bg-pink-50 dark:bg-pink-900/20',
+                    'LinkedIn': 'text-blue-700 bg-blue-50 dark:bg-blue-900/20',
+                    'Twitter': 'text-sky-500 bg-sky-50 dark:bg-sky-900/20',
+                    'YouTube': 'text-red-600 bg-red-50 dark:bg-red-900/20'
+                };
+                const statusColors = {
+                    'idea': 'bg-gray-200 text-gray-700',
+                    'scheduled': 'bg-brand-100 text-brand-700',
+                    'published': 'bg-green-100 text-green-700'
+                };
+
+                const div = document.createElement('div');
+                div.className = 'group bg-white dark:bg-zinc-900 p-4 rounded-lg border border-gray-100 dark:border-zinc-800 shadow-sm flex items-center gap-4 hover:shadow-md transition cursor-move';
+                div.innerHTML = `
+                    <i data-lucide="grip-vertical" class="text-gray-300"></i>
+                    <div class="h-10 w-10 rounded-md bg-gray-100 overflow-hidden flex-shrink-0">
+                        ${post.imageUrl ? `<img src="${post.imageUrl}" class="h-full w-full object-cover">` : '<div class="h-full w-full flex items-center justify-center text-gray-400"><i data-lucide="image"></i></div>'}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded ${platformColors[post.platform] || 'text-gray-500'}">${post.platform}</span>
+                            <span class="text-xs px-2 py-0.5 rounded ${statusColors[post.status]}">${post.status}</span>
+                        </div>
+                        <h4 class="font-medium truncate text-gray-900 dark:text-gray-100">${post.title}</h4>
+                        <p class="text-xs text-gray-500">${dateObj.toLocaleDateString()} @ ${dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                    </div>
+                    <button onclick="deletePost('${post.id}')" class="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                `;
+                container.appendChild(div);
+            });
+            lucide.createIcons();
+            
+            // Initialize Sortable
+            new Sortable(container, { animation: 150, handle: '.cursor-move' });
+        }
+
+        async function deletePost(id) {
+            if(confirm('Delete this post?')) {
+                await db.collection('users').doc(currentUser.uid).collection('posts').doc(id).delete();
+            }
+        }
+
+        // --- 5. CALENDAR LOGIC ---
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById('cal-month-name').textContent = `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+
+            const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+            const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+            
+            // Empty slots for previous month
+            for (let i = 0; i < firstDay.getDay(); i++) {
+                const div = document.createElement('div');
+                div.className = 'h-32 bg-gray-50 dark:bg-zinc-950/30';
+                grid.appendChild(div);
+            }
+
+            // Days
+            for (let d = 1; d <= lastDay.getDate(); d++) {
+                const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dayPosts = postsCache.filter(p => p.date.startsWith(dateStr));
+
+                const div = document.createElement('div');
+                div.className = 'h-32 bg-white dark:bg-zinc-900 p-2 overflow-y-auto hover:bg-gray-50 dark:hover:bg-zinc-800 transition relative group';
+                
+                let postsHtml = dayPosts.map(p => `
+                    <div class="text-[10px] bg-brand-100 dark:bg-brand-900 text-brand-800 dark:text-brand-200 p-1 rounded mb-1 truncate cursor-pointer hover:opacity-80">
+                        ${p.platform.charAt(0)}: ${p.title}
+                    </div>
+                `).join('');
+
+                div.innerHTML = `
+                    <span class="text-sm font-semibold text-gray-400">${d}</span>
+                    <button class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-brand-600" onclick="navigate('planner')"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>
+                    <div class="mt-1">${postsHtml}</div>
+                `;
+                grid.appendChild(div);
+            }
+            lucide.createIcons();
+        }
+
+        function changeMonth(delta) {
+            currentMonth.setMonth(currentMonth.getMonth() + delta);
+            renderCalendar();
+        }
+
+        // --- 6. FAKE AI TOOLS ---
+        function runAI(type) {
+            const output = document.getElementById('ai-output');
+            output.innerHTML = `<div class="flex justify-center py-10"><div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-8 w-8"></div></div>`;
+            
+            setTimeout(() => {
+                let results = [];
+                if (type === 'caption') {
+                    results = [
+                        "Unlock your true potential with this simple hack. #GrowthMindset",
+                        "Stop scrolling and start creating. Here is how I did it.",
+                        "The secret to productivity isn't more time, it's better focus."
+                    ];
+                } else if (type === 'hashtags') {
+                    results = ["#SaaS #WebDev #BuildInPublic #IndieHacker #NoCode"];
+                } else {
+                    results = ["POV: You found the perfect tool", "3 Mistakes killing your reach", "Save this for later"];
+                }
+
+                output.innerHTML = results.map(text => `
+                    <div class="bg-white dark:bg-zinc-900 p-4 rounded-lg border border-gray-200 dark:border-zinc-800 shadow-sm flex justify-between items-center fade-in">
+                        <p class="text-sm text-gray-800 dark:text-gray-200 font-medium">${text}</p>
+                        <div class="flex gap-2">
+                            <button onclick="navigator.clipboard.writeText('${text}')" class="text-xs bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded hover:bg-brand-100 hover:text-brand-600 transition">Copy</button>
+                            <button class="text-xs bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded hover:bg-brand-100 hover:text-brand-600 transition">Save</button>
+                        </div>
+                    </div>
+                `).join('');
+            }, 1500);
+        }
+
+        // --- 7. ANALYTICS ---
+        function renderAnalytics() {
+            // Destroy old charts if they exist
+            // (Simplified for this snippet: assume re-render isn't frequent or handled by Chart.js update)
+            
+            // Platforms Data
+            const platforms = {};
+            postsCache.forEach(p => platforms[p.platform] = (platforms[p.platform] || 0) + 1);
+            
+            new Chart(document.getElementById('chart-platforms'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(platforms),
+                    datasets: [{
+                        label: 'Posts',
+                        data: Object.values(platforms),
+                        backgroundColor: '#4f46e5',
+                        borderRadius: 4
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+
+            // Status Data
+            const statuses = {};
+            postsCache.forEach(p => statuses[p.status] = (statuses[p.status] || 0) + 1);
+
+            new Chart(document.getElementById('chart-status'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statuses),
+                    datasets: [{
+                        data: Object.values(statuses),
+                        backgroundColor: ['#e5e7eb', '#4f46e5', '#22c55e']
+                    }]
+                }
+            });
+        }
+
+        // --- 8. BACKUP & RESTORE ---
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(postsCache));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "accurex_backup.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const posts = JSON.parse(e.target.result);
+                const batch = db.batch();
+                posts.forEach(post => {
+                    const ref = db.collection('users').doc(currentUser.uid).collection('posts').doc();
+                    delete post.id; // Remove old ID
+                    batch.set(ref, post);
+                });
+                await batch.commit();
+                alert('Backup restored successfully!');
+                fetchPosts();
+            };
+            reader.readAsText(file);
+        }
+
+        // --- 9. DASHBOARD STATS ---
+        function updateDashboardStats() {
+            document.getElementById('dash-total').textContent = postsCache.length;
+            document.getElementById('dash-scheduled').textContent = postsCache.filter(p => p.status === 'scheduled').length;
+            document.getElementById('dash-completed').textContent = postsCache.filter(p => p.status === 'published').length;
+
+            const recent = postsCache.slice(0, 3);
+            document.getElementById('dashboard-recent-list').innerHTML = recent.map(p => `
+                 <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="h-2 w-2 rounded-full bg-brand-500"></div>
+                        <span class="text-sm font-medium dark:text-white">${p.title}</span>
+                    </div>
+                    <span class="text-xs text-gray-500">${p.platform}</span>
+                 </div>
+            `).join('');
+        }
+
+        // Initialize Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
