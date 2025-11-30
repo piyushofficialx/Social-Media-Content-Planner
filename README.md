@@ -106,34 +106,6 @@ Each generated card includes:
 
 ---
 
-### **📂 Project Structure**
-```
-root/
-│── index.html
-│── dashboard.html
-│── planner.html
-│── calendar.html
-│── library.html
-│── analytics.html
-│── settings.html
-│── auth/
-│   ├── login.html
-│   ├── signup.html
-│   └── reset.html
-│── assets/
-│   ├── css/
-│   ├── js/
-│   ├── icons/
-│   └── images/
-│── firebase/
-│   ├── config.js
-│   └── auth.js
-│── backup/
-│   └── example.json
-```
-
----
-
 ### **💾 Installation**
 
 #### **1. Clone the Repository**
